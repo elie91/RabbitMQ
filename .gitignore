@@ -1,2 +1,5 @@
 .DS_Store
 .idea/
+.docker
+1_HelloWorld/node_modules
+2_WorkQueues/node_modules
