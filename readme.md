@@ -52,7 +52,7 @@ Vous avez peut-être remarqué que la répartition ne fonctionne toujours pas ex
 
 Eh bien, RabbitMQ n'en sait rien et enverra toujours les messages de manière uniforme.
 
-Cela se produit car RabbitMQ distribue simplement un message lorsque le message entre dans la file d'attente. Il ne regarde pas le nombre de messages non acquittés pour un consommateur. Il envoie juste aveuglément chaque n-ième message au n-ième consommateur.
+Cela se produit car RabbitMQ distribue simplement un message lorsque le message entre dans la queue. Il ne regarde pas le nombre de messages non acquittés pour un consommateur. Il envoie juste aveuglément chaque n-ième message au n-ième consommateur.
 
 Pour éviter cela, nous pouvons utiliser `channel.prefetch(1);`. 
 Cela indique à RabbitMQ de ne pas donner plus d'un message à un travailleur à la fois. Ou, en d'autres termes, n'envoyez pas un nouveau message à un travailleur tant qu'il n'a pas traité et reconnu le précédent. Au lieu de cela, il l'envoie au prochain travailleur qui n'est pas encore occupé.
@@ -60,27 +60,35 @@ Cela indique à RabbitMQ de ne pas donner plus d'un message à un travailleur à
 ## Publish Subscribe
 
 L'idée centrale du modèle de messagerie de RabbitMQ est que le producer n'envoie jamais de messages directement à une queue. 
-En fait, très souvent, le producer ne sait même pas si un message sera remis à une file d'attente.
-Au lieu de cela, le producer ne peut envoyer des messages qu'à un échange.
+En fait, très souvent, le producer ne sait même pas si un message sera remis à une queue.
+Au lieu de cela, le producer ne peut envoyer des messages qu'à un exchange.
 
-Un échange est une chose très simple. D'un côté, il reçoit les messages des producteurs et de l'autre, il les pousse dans les files d'attente. 
-L'échange doit savoir exactement quoi faire avec un message qu'il reçoit. Doit-il être ajouté à une file d'attente particulière? Doit-il être ajouté à de nombreuses files d'attente? Ou devrait-il être jeté. Les règles pour cela sont définies par le type d'échange.
+Un exchange est une chose très simple. D'un côté, il reçoit les messages des producteurs et de l'autre, il les pousse dans les queue. 
+L'exchange doit savoir exactement quoi faire avec un message qu'il reçoit. Doit-il être ajouté à une queue particulière? Doit-il être ajouté à de nombreuses files d'attente? Ou devrait-il être jeté. Les règles pour cela sont définies par le type d'échange.
 
 
 Il existe différents types d'exchanges disponibles: `direct`, `topic`, `headers` and `fanout`.
 * `fanout`: diffuse tous les messages qu'il reçoit à toutes les queues qu'il connaît
+* `direct`: Un message ne va dans une queue que si la `binding key` de cette queue matche exactement la `routing key` du message. Si plusieurs queue possède la même clé que celle du message, l'exchange fonctionnera donc comme `fanout` et enverra les messages a toutes les queues matchés
 
 ### Temporary queues
 
-when we supply queue name as an empty string, we create a non-durable queue with a generated name:
+lorsque nous fournissons un nom de queue comme une chaîne vide, nous créons une queue non durable avec un nom généré :
 
 `channel.assertQueue('', { exclusive: true });`
 
-When the connection that declared it closes, the queue will be deleted because it is declared as exclusive
+Lorsque la connexion déclarée se ferme, la queue sera supprimée car elle est déclarée comme exclusive
 
 ### Bindings
 
-We've already created a fanout exchange and a queue. Now we need to tell the exchange to send messages to our queue. That relationship between exchange and a queue is called a binding.
+Nous avons déjà créé un fanout exchange et une queue. Maintenant, nous devons dire à l’exchange d’envoyer des messages à notre queue. Cette relation entre l’exchange et une queue s’appelle un `binding`.
 
 `channel.bindQueue(queue_name, 'logs', '');`
 
+Ceci peut être simplement lu comme : la queue est intéressée par les messages de cet exchange.
+
+Les bindings peuvent prendre un paramètre de clé de liaison supplémentaire (la chaîne vide dans le code ci-dessus). C’est ainsi que nous pourrions créer un binding avec une clé :
+
+`channel.bindQueue(queue_name, exchange_name, 'black');`
+
+La signification d’une clé de binding dépend du type d’exchange. Les exchanges fanout, que nous avons utilisés précédemment, ont simplement ignoré sa valeur.
