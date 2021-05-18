@@ -70,6 +70,7 @@ L'exchange doit savoir exactement quoi faire avec un message qu'il reçoit. Doit
 Il existe différents types d'exchanges disponibles: `direct`, `topic`, `headers` and `fanout`.
 * `fanout`: diffuse tous les messages qu'il reçoit à toutes les queues qu'il connaît
 * `direct`: Un message ne va dans une queue que si la `binding key` de cette queue matche exactement la `routing key` du message. Si plusieurs queue possède la même clé que celle du message, l'exchange fonctionnera donc comme `fanout` et enverra les messages a toutes les queues matchés
+* `topic`: Les exchanges de type topic permettent en plus de ce que fais le `direct`, de filtrer également les messages en fonction de la source ayant émises les logs (auth/cron/kernel etc) Voir section Topics plus bas
 
 ### Temporary queues
 
@@ -92,3 +93,42 @@ Les bindings peuvent prendre un paramètre de clé de liaison supplémentaire (l
 `channel.bindQueue(queue_name, exchange_name, 'black');`
 
 La signification d’une clé de binding dépend du type d’exchange. Les exchanges fanout, que nous avons utilisés précédemment, ont simplement ignoré sa valeur.
+
+
+### Topics / Pattern
+
+Les messages envoyés à un exchange `topic` ne peuvent pas avoir une  `routing_key` arbitraire - ce doit être une liste de mots, délimitée par des points. Les mots peuvent être n’importe quoi, mais généralement ils spécifient certaines fonctionnalités liées au message. Quelques exemples de routage valides : `stock.usd.nyse`, `nyse.vmw`, `quick.orange.rabbit`. Il peut y avoir autant de mots dans la clé de routage que vous le souhaitez, jusqu’à la limite de 255 octets.
+
+La clé de liaison doit également être dans la même forme. La logique derrière l'exchange `topic` est similaire au `direct` - un message envoyé avec une clé de routage particulière sera livré à toutes les queue qui sont liées avec une clé de liaison correspondant. Cependant, il existe deux cas spéciaux importants pour les clés de reliure:
+
+* (étoile * ) peut remplacer exactement un mot.
+* (hash #) peut remplacer zéro ou plus de mots.
+
+Exemple: we're going to send messages which all describe animals. The messages will be sent with a routing key that consists of three words (two dots). The first word in the routing key will describe speed, second a colour and third a species: "<'speed'>.<'colour'>.<'species'>".
+
+We created three bindings: Q1 is bound with binding key "*.orange.*" and Q2 with "*.*.rabbit" and "lazy.#".
+
+These bindings can be summarised as:
+
+Q1 is interested in all the orange animals.
+Q2 wants to hear everything about rabbits, and everything about lazy animals.
+
+`Topic` exchange is powerful and can behave like other exchanges.
+
+When a queue is bound with "#" (hash) binding key - it will receive all the messages, regardless of the routing key - like in `fanout` exchange.
+
+When special characters "*" (star) and "#" (hash) aren't used in bindings, the topic exchange will behave just like a `direct` one.
+
+To receive all the logs:
+
+`./receive_logs_topic.js "#"`
+To receive all logs from the facility "kern":
+
+`./receive_logs_topic.js "kern.*"`
+Or if you want to hear only about "critical" logs:
+
+`./receive_logs_topic.js "*.critical"`
+
+You can create multiple bindings:
+
+`./receive_logs_topic.js "kern.*" "*.critical"`
